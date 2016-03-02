@@ -1,0 +1,66 @@
+- name: Configure server
+  hosts: all
+  gather_facts: no
+  become: True
+  vars:
+    defaultsystemtarget: 'graphical.target'
+
+  tasks:
+    - name: Encrypt the default password
+      set_fact:
+        password: "{{ lookup('pipe', 'echo $USER | mkpasswd --method=SHA-512 --stdin') }}"
+    - name: Create normal user
+      user: name={{ lookup('env', 'USER') }} password={{ password }} groups=adm,sudo shell=/bin/bash
+    - name: Deploy additional SSH key(s) to the management account
+      authorized_key:
+        user: "{{ lookup('env', 'USER') }}"
+        manage_dir: yes
+        key: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
+
+    - name: Update APT cache
+      apt: update_cache=yes
+
+    - name: Install additional packages
+      apt: name={{ item }} state=present
+      with_items:
+        - bash-completion
+        - screen
+        - awscli
+
+    - name: Install GNOME Desktop
+      apt: name="ubuntu-desktop" state=present
+      with_items:
+        - 'ubuntu-desktop'
+        - 'unity-tweak-tool'
+
+    - name: Install additional packages for graphical environment
+      apt: name={{ item }} state=present
+      with_items:
+        - evolution
+        - firefox
+        - git-cola
+
+    - name: Set default run level to graphical
+      shell: |
+        if [ "x{{ defaultsystemtarget }}" != "x`systemctl get-default`" ]
+        then
+           systemctl set-default {{ defaultsystemtarget }}
+        else
+           echo {{ defaultsystemtarget }} already set >&2
+        fi
+      register: defaultrunlevel
+      changed_when: >
+        "defaultrunlevel.rc == 0" and ("already set" not in defaultrunlevel.stderr)
+
+    - name: Activate graphical run level
+      shell: |
+        if [ "xactive" != "x`systemctl is-active {{ defaultsystemtarget }}`" ]
+        then
+           systemctl isolate {{ defaultsystemtarget }}
+        else
+           echo {{ defaultsystemtarget }} already active >&2
+        fi
+      register: changerunlevel
+      changed_when: >
+        "changerunlevel.rc == 0" and ("already active" not in changerunlevel.stderr)
+# vim: ts=4:tw=4:et:si

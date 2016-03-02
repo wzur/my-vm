@@ -1,0 +1,4 @@
+/provisioning/Ansiblefile.lock
+/provisioning/roles/
+/provisioning/tmp/
+/.vagrant/
