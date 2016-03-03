@@ -17,26 +17,39 @@
         manage_dir: yes
         key: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
 
-    - name: Update APT cache
-      apt: update_cache=yes
+    - name: Make sure the system is up to date
+      environment:
+        DEBIAN_FRONTEND: noninteractive
+      apt: upgrade=yes update_cache=yes
 
     - name: Install additional packages
+      environment:
+        DEBIAN_FRONTEND: noninteractive
       apt: name={{ item }} state=present
       with_items:
         - bash-completion
         - screen
+        - mc
         - awscli
+        - imagemagick
 
-    - name: Install GNOME Desktop
-      apt: name="ubuntu-desktop" state=present
+    - name: Install Ubuntu Desktop
+      environment:
+        DEBIAN_FRONTEND: noninteractive
+      apt: name="{{ item }}" state=present
       with_items:
         - 'ubuntu-desktop'
         - 'unity-tweak-tool'
+        - 'vim-gnome'
 
     - name: Install additional packages for graphical environment
+      environment:
+        DEBIAN_FRONTEND: noninteractive
       apt: name={{ item }} state=present
       with_items:
         - evolution
+        - evolution-ews
+        - evolution-rss
         - firefox
         - git-cola
 
@@ -63,4 +76,27 @@
       register: changerunlevel
       changed_when: >
         "changerunlevel.rc == 0" and ("already active" not in changerunlevel.stderr)
+
+    - name: Schedule a reboot (if needed)
+      shell: sleep 2 && shutdown -r now "Ansible updates triggered"
+      args:
+        removes: /var/run/reboot-required
+      async: 1
+      poll: 0
+      ignore_errors: true
+      register: reboot
+
+    - name: Waiting for the machine to come back after reboot
+      become: false
+      local_action: wait_for host={{ inventory_hostname }} port=22 delay=30 timeout=320 state=started
+      when: reboot.changed
+
+    - name: Configure VirtualBox additions for graphical environment
+      shell: >
+        test -f /var/lib/VBoxGuestAdditions/config &&
+        . /var/lib/VBoxGuestAdditions/config &&
+        "${INSTALL_DIR}/init/vboxadd-x11" setup
+      args:
+        creates: /etc/X11/Xsession.d/98vboxadd-xclient # a random pick of files created by this command
+
 # vim: ts=4:tw=4:et:si

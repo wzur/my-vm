@@ -11,7 +11,7 @@ project_name = "my"
 VAGRANTFILE_API_VERSION = "2"
 
 Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
-    config.vm.box = "wzurowski/wily"
+    config.vm.box = "wzurowski/wily64"
 
 ##     config.vm.network :forwarded_port, guest: 80, host: 8080
 
@@ -51,7 +51,7 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
             '--medium', 'emptydrive'
           ]
           vb.gui = true
-          vb.name = 'My'
+          vb.name = project_name.capitalize
           vb.memory = 4096
         end
 
